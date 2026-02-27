@@ -295,7 +295,7 @@ if (printingItemCount.count === 0) {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = parseInt(process.env.PORT || "3000", 10);
 
   app.use(express.json());
   app.use("/uploads", express.static(uploadsDir));
@@ -607,8 +607,16 @@ app.get("/api/blog/media", (req, res) => {
   res.json(media);
 });
 
-app.listen(PORT, "0.0.0.0", () => {
+const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`Port ${PORT} is already in use. Please close other servers or use a different port.`);
+      process.exit(1);
+    }
+    throw err;
   });
 }
 
