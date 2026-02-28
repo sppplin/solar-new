@@ -7,72 +7,16 @@ import {
   MapPin, Clock, Building2, Flame, Sparkles, ArrowRight, Printer
 } from 'lucide-react';
 import { SITE } from '../constants';
-
-interface Product {
-  id: number;
-  name: string;
-  category: string;
-  sub_category: string;
-  price: string;
-  moq: string;
-  image_url: string;
-  image_alt: string;
-  badge: string;
-  link: string;
-  min_price: number;
-}
-
-interface Service {
-  id: number;
-  name: string;
-  description: string;
-  image_url: string;
-  icon_name: string;
-  tags: string[];
-  link: string;
-}
+import { useProducts, useServices } from '../hooks/useApi';
 
 interface HomeProps {
   onOpenModal: (product?: string) => void;
 }
 
 const Home: React.FC<HomeProps> = ({ onOpenModal }) => {
-  const [products, setProducts] = React.useState<Product[]>([]);
-  const [services, setServices] = React.useState<Service[]>([]);
-  const [loading, setLoading] = React.useState(true);
-
-  const fetchProducts = async () => {
-    try {
-      const response = await fetch('/api/products');
-      if (response.ok) {
-        const data = await response.json();
-        setProducts(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch products:', error);
-    }
-  };
-
-  const fetchServices = async () => {
-    try {
-      const response = await fetch('/api/services');
-      if (response.ok) {
-        const data = await response.json();
-        setServices(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch services:', error);
-    }
-  };
-
-  React.useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      await Promise.all([fetchProducts(), fetchServices()]);
-      setLoading(false);
-    };
-    init();
-  }, []);
+  const { products, isLoading: productsLoading } = useProducts();
+  const { services, isLoading: servicesLoading } = useServices();
+  const loading = productsLoading || servicesLoading;
 
   const getIconByName = (name: string, size = 40) => {
     switch (name) {
