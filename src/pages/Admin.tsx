@@ -1,5 +1,6 @@
 import React from 'react';
 import { ClipboardList, Trash2, Calendar, User, Phone, Mail, Building, Package2, MessageSquare, CheckCircle, Loader2, Plus, Edit2, Image as ImageIcon, Save, X, FileText, Settings as SettingsIcon, Eye, Globe, Clock, Tag } from 'lucide-react';
+import { useSWRConfig } from 'swr';
 import { BlogEditor } from '../components/BlogEditor';
 
 interface Enquiry {
@@ -76,11 +77,8 @@ interface PrintingItem {
   display_order: number;
 }
 
-interface AdminProps {
-  onSettingsUpdate?: () => void;
-}
-
-const Admin: React.FC<AdminProps> = ({ onSettingsUpdate }) => {
+const Admin: React.FC = () => {
+  const { mutate } = useSWRConfig();
   const [enquiries, setEnquiries] = React.useState<Enquiry[]>([]);
   const [products, setProducts] = React.useState<Product[]>([]);
   const [posts, setPosts] = React.useState<BlogPost[]>([]);
@@ -225,7 +223,7 @@ const Admin: React.FC<AdminProps> = ({ onSettingsUpdate }) => {
       });
       if (response.ok) {
         alert('Settings updated successfully!');
-        if (onSettingsUpdate) onSettingsUpdate();
+        mutate('/api/settings');
       }
     } catch (error) {
       alert('Failed to update settings');
@@ -1583,7 +1581,7 @@ const Admin: React.FC<AdminProps> = ({ onSettingsUpdate }) => {
                             const data = await response.json();
                             setLogoUrl(data.logo_url);
                             alert('Logo uploaded successfully!');
-                            if (onSettingsUpdate) onSettingsUpdate();
+                            mutate('/api/settings');
                           } else {
                             const err = await response.json();
                             alert(err.error || 'Upload failed');
