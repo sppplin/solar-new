@@ -19,6 +19,8 @@ export default defineConfig(({mode}) => {
       outDir: 'dist',
     },
     server: {
+      port: parseInt(process.env.PORT || '3000', 10),
+      strictPort: false,
       hmr: process.env.DISABLE_HMR !== 'true',
     },
   };
