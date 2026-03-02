@@ -3,7 +3,7 @@ import sql from '../_lib/db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -41,6 +41,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (error) {
       console.error('Product save error:', error);
       return res.status(500).json({ error: 'Failed to save product' });
+    }
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.query;
+    try {
+      await sql`DELETE FROM products WHERE id = ${id}`;
+      return res.json({ success: true });
+    } catch (error) {
+      console.error('Product delete error:', error);
+      return res.status(500).json({ error: 'Failed to delete product' });
     }
   }
 
