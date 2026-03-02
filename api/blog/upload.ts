@@ -8,85 +8,96 @@ export const config = {
   },
 };
 
+async function parseMultipartFormData(req: VercelRequest): Promise<{ buffer: Buffer; filename: string; contentType: string } | null> {
+  const contentType = req.headers['content-type'] || '';
+  
+  if (!contentType.includes('multipart/form-data')) {
+    return null;
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  const buffer = Buffer.concat(chunks);
+  
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+  if (!boundaryMatch) {
+    return null;
+  }
+  const boundary = '--' + (boundaryMatch[1] || boundaryMatch[2]);
+  
+  const boundaryBuffer = Buffer.from(boundary);
+  const crlfCrlf = Buffer.from('\r\n\r\n');
+  
+  let start = buffer.indexOf(boundaryBuffer);
+  if (start === -1) return null;
+  
+  start += boundaryBuffer.length;
+  
+  const headerEnd = buffer.indexOf(crlfCrlf, start);
+  if (headerEnd === -1) return null;
+  
+  const headerSection = buffer.slice(start, headerEnd).toString('utf8');
+  
+  const filenameMatch = headerSection.match(/filename="([^"]+)"/);
+  const ctMatch = headerSection.match(/Content-Type:\s*([^\r\n]+)/i);
+  
+  const filename = filenameMatch ? filenameMatch[1] : 'upload.png';
+  const fileContentType = ctMatch ? ctMatch[1].trim() : 'image/png';
+  
+  const contentStart = headerEnd + 4;
+  const nextBoundary = buffer.indexOf(boundaryBuffer, contentStart);
+  const contentEnd = nextBoundary !== -1 ? nextBoundary - 2 : buffer.length;
+  
+  const fileBuffer = buffer.slice(contentStart, contentEnd);
+  
+  return {
+    buffer: fileBuffer,
+    filename,
+    contentType: fileContentType,
+  };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const contentType = req.headers['content-type'] || '';
+    const parsed = await parseMultipartFormData(req);
     
-    if (!contentType.includes('multipart/form-data')) {
-      return res.status(400).json({ error: 'Content-Type must be multipart/form-data' });
+    if (!parsed || parsed.buffer.length === 0) {
+      return res.status(400).json({ error: 'No file uploaded or invalid format' });
     }
 
-    // Parse the multipart form data manually
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-    
-    // Extract boundary from content-type header
-    const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
-    if (!boundaryMatch) {
-      return res.status(400).json({ error: 'No boundary found' });
-    }
-    const boundary = boundaryMatch[1] || boundaryMatch[2];
-    
-    // Simple multipart parser to extract file
-    const parts = buffer.toString('binary').split(`--${boundary}`);
-    let fileBuffer: Buffer | null = null;
-    let filename = 'blog-image';
-    let mimeType = 'image/png';
-    let fileSize = 0;
-    
-    for (const part of parts) {
-      if (part.includes('filename=')) {
-        const filenameMatch = part.match(/filename="([^"]+)"/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
-        
-        const contentTypeMatch = part.match(/Content-Type:\s*([^\r\n]+)/i);
-        if (contentTypeMatch) {
-          mimeType = contentTypeMatch[1].trim();
-        }
-        
-        // Find the start of file content (after double CRLF)
-        const headerEndIndex = part.indexOf('\r\n\r\n');
-        if (headerEndIndex !== -1) {
-          const fileContent = part.slice(headerEndIndex + 4);
-          // Remove trailing boundary markers
-          const cleanContent = fileContent.replace(/\r\n--$/, '').replace(/--\r\n$/, '').replace(/\r\n$/, '');
-          fileBuffer = Buffer.from(cleanContent, 'binary');
-          fileSize = fileBuffer.length;
-        }
-      }
-    }
-    
-    if (!fileBuffer) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+    const { buffer, filename, contentType } = parsed;
 
-    // Upload to Vercel Blob
     const ext = filename.split('.').pop() || 'png';
     const blobFilename = `blog-${Date.now()}.${ext}`;
     
-    const blob = await put(blobFilename, fileBuffer, {
+    const blob = await put(blobFilename, buffer, {
       access: 'public',
-      contentType: mimeType,
+      contentType: contentType,
     });
 
     // Save to blog_media table
     await sql`
       INSERT INTO blog_media (url, filename, mimetype, size) 
-      VALUES (${blob.url}, ${blobFilename}, ${mimeType}, ${fileSize})
+      VALUES (${blob.url}, ${blobFilename}, ${contentType}, ${buffer.length})
     `;
 
     return res.json({ url: blob.url });
   } catch (error) {
     console.error('Upload error:', error);
-    return res.status(500).json({ error: 'Failed to upload image' });
+    return res.status(500).json({ error: 'Failed to upload image', details: String(error) });
   }
 }

@@ -2,6 +2,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import sql from '../_lib/db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method === 'GET') {
     try {
       const products = await sql`SELECT * FROM products ORDER BY created_at DESC`;
@@ -33,6 +41,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (error) {
       console.error('Product save error:', error);
       return res.status(500).json({ error: 'Failed to save product' });
+    }
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.query;
+    try {
+      await sql`DELETE FROM products WHERE id = ${id}`;
+      return res.json({ success: true });
+    } catch (error) {
+      console.error('Product delete error:', error);
+      return res.status(500).json({ error: 'Failed to delete product' });
     }
   }
 
