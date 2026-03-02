@@ -84,19 +84,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const parsed = await parseMultipartFormData(req);
     
     if (!parsed || parsed.buffer.length === 0) {
+      console.error('[v0] No file parsed from multipart data');
       return res.status(400).json({ error: 'No file uploaded or invalid format' });
     }
 
     const { buffer, filename, contentType } = parsed;
+    console.error('[v0] Parsed file:', { filename, contentType, bufferSize: buffer.length });
 
     // Upload to Vercel Blob
     const ext = filename.split('.').pop() || 'png';
     const blobFilename = `logo-${Date.now()}.${ext}`;
     
+    console.error('[v0] Uploading to Vercel Blob:', blobFilename);
     const blob = await put(blobFilename, buffer, {
       access: 'public',
       contentType: contentType,
     });
+    console.error('[v0] Upload successful:', blob.url);
 
     // Update settings in DB
     await sql`
@@ -106,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.json({ success: true, logo_url: blob.url });
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('[v0] Upload error:', error);
     return res.status(500).json({ error: 'Failed to upload logo', details: String(error) });
   }
 }

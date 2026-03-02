@@ -76,18 +76,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const parsed = await parseMultipartFormData(req);
     
     if (!parsed || parsed.buffer.length === 0) {
+      console.error('[v0] No file parsed from multipart data');
       return res.status(400).json({ error: 'No file uploaded or invalid format' });
     }
 
     const { buffer, filename, contentType } = parsed;
+    console.error('[v0] Parsed file:', { filename, contentType, bufferSize: buffer.length });
 
     const ext = filename.split('.').pop() || 'png';
     const blobFilename = `blog-${Date.now()}.${ext}`;
     
+    console.error('[v0] Uploading to Vercel Blob:', blobFilename);
     const blob = await put(blobFilename, buffer, {
       access: 'public',
       contentType: contentType,
     });
+    console.error('[v0] Upload successful:', blob.url);
 
     // Save to blog_media table
     await sql`
@@ -97,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.json({ url: blob.url });
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('[v0] Upload error:', error);
     return res.status(500).json({ error: 'Failed to upload image', details: String(error) });
   }
 }
