@@ -7,6 +7,10 @@ export const config = {
   },
 };
 
+// Allowed MIME types for images
+const ALLOWED_MIMES = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp'];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
 async function parseMultipartFormData(req: VercelRequest): Promise<{ buffer: Buffer; filename: string; contentType: string } | null> {
   const contentType = req.headers['content-type'] || '';
   
@@ -75,10 +79,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const parsed = await parseMultipartFormData(req);
     
     if (!parsed || parsed.buffer.length === 0) {
-      return res.status(400).json({ error: 'No file uploaded or invalid format' });
+      console.error('[v0] No file parsed or empty buffer');
+      return res.status(400).json({ error: 'No file uploaded' });
     }
 
     const { buffer, filename, contentType } = parsed;
+
+    // Validate file type
+    if (!ALLOWED_MIMES.includes(contentType)) {
+      console.error('[v0] Invalid file type:', contentType);
+      return res.status(400).json({ error: 'Invalid file type. Allowed: SVG, PNG, JPG, WEBP' });
+    }
+
+    // Validate file size
+    if (buffer.length > MAX_FILE_SIZE) {
+      console.error('[v0] File too large:', buffer.length, 'bytes');
+      return res.status(400).json({ error: 'File too large. Maximum: 5MB' });
+    }
 
     const ext = filename.split('.').pop() || 'png';
     const blobFilename = `product-${Date.now()}.${ext}`;
@@ -90,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.json({ success: true, image_url: blob.url });
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('[v0] Upload error:', error);
     return res.status(500).json({ error: 'Failed to upload image', details: String(error) });
   }
 }
